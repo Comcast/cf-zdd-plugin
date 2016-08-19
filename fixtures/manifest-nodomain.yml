@@ -1,0 +1,5 @@
+---
+memory: 1024M
+timeout: 120
+host: ars-dev
+instances: 1

@@ -15,8 +15,10 @@
 package scaleover
 
 import (
+	"errors"
 	"time"
 
+	"github.com/cloudfoundry/cli/plugin/models"
 	"github.com/cloudfoundry/cli/plugin/pluginfakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -25,7 +27,7 @@ import (
 var _ = Describe("Scaleover", func() {
 	var scaleoverCmdPlugin *ScaleoverCmd
 	var fakeCliConnection *pluginfakes.FakeCliConnection
-
+	domain := plugin_models.GetApp_DomainFields{Name: "cfapps.io"}
 	Describe("getAppStatus", func() {
 
 		BeforeEach(func() {
@@ -34,24 +36,26 @@ var _ = Describe("Scaleover", func() {
 		})
 
 		It("should Fail Without App 1", func() {
-			fakeCliConnection.CliCommandWithoutTerminalOutputReturns([]string{"FAILED", "App app1 not found"}, nil)
+			app := plugin_models.GetAppModel{}
+			fakeCliConnection.GetAppReturns(app, errors.New("App app1 not found"))
 			var err error
 			_, err = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app1")
 			Expect(err.Error()).To(Equal("App app1 not found"))
 		})
 
 		It("should Fail Without App 2", func() {
-			fakeCliConnection.CliCommandWithoutTerminalOutputReturns([]string{"FAILED", "App app2 not found"}, nil)
+			app := plugin_models.GetAppModel{}
+			fakeCliConnection.GetAppReturns(app, errors.New("App app2 not found"))
 			var err error
 			_, err = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app2")
 			Expect(err.Error()).To(Equal("App app2 not found"))
 		})
 
 		It("should not start a stopped target with 1 instance", func() {
-			cfAppOutput := []string{"requested state: stopped\ninstances: 0/1"}
-			fakeCliConnection.CliCommandWithoutTerminalOutputReturns(cfAppOutput, nil)
+			app := plugin_models.GetAppModel{State: "stopped"}
+			fakeCliConnection.GetAppReturns(app, nil)
 
-			var status AppStatus
+			var status *AppStatus
 			status, _ = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app1")
 
 			Expect(status.name).To(Equal("app1"))
@@ -61,10 +65,16 @@ var _ = Describe("Scaleover", func() {
 		})
 
 		It("should start a started app with 10 instances", func() {
-			cfAppOutput := []string{"requested state: started\ninstances: 10/10"}
-			fakeCliConnection.CliCommandWithoutTerminalOutputReturns(cfAppOutput, nil)
 
-			var status AppStatus
+			cfApp := plugin_models.GetAppModel{
+				InstanceCount:    10,
+				RunningInstances: 10,
+				State:            "started",
+			}
+
+			fakeCliConnection.GetAppReturns(cfApp, nil)
+
+			var status *AppStatus
 			status, _ = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app1")
 
 			Expect(status.name).To(Equal("app1"))
@@ -74,10 +84,15 @@ var _ = Describe("Scaleover", func() {
 		})
 
 		It("should keep a stop app stopped with 10 instances", func() {
-			cfAppOutput := []string{"requested state: stopped\ninstances: 0/10"}
-			fakeCliConnection.CliCommandWithoutTerminalOutputReturns(cfAppOutput, nil)
+			cfApp := plugin_models.GetAppModel{
+				InstanceCount:    10,
+				RunningInstances: 0,
+				State:            "stopped",
+			}
 
-			var status AppStatus
+			fakeCliConnection.GetAppReturns(cfApp, nil)
+
+			var status *AppStatus
 			status, _ = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app1")
 
 			Expect(status.name).To(Equal("app1"))
@@ -87,22 +102,39 @@ var _ = Describe("Scaleover", func() {
 		})
 
 		It("should populate the routes for an app with one url", func() {
-
-			cfAppOutput := []string{"requested state: stopped\ninstances: 0/10\nurls: app.cfapps.io"}
-			fakeCliConnection.CliCommandWithoutTerminalOutputReturns(cfAppOutput, nil)
-
-			var status AppStatus
+			routes := []plugin_models.GetApp_RouteSummary{
+				{
+					Host:   "app",
+					Domain: domain,
+				},
+			}
+			var status *AppStatus
+			app := plugin_models.GetAppModel{Routes: routes}
+			fakeCliConnection.GetAppReturns(app, nil)
 			status, _ = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app1")
 			Expect(len(status.routes)).To(Equal(1))
 			Expect(status.routes[0]).To(Equal("app.cfapps.io"))
 		})
 
 		It("should populate the routes for an app with three urls", func() {
-			cfAppOutput := []string{"requested state: stopped\ninstances: 0/10\nurls: app.cfapps.io, foo-app.cfapps.io, foo-app-b.cfapps.io"}
+			routes := []plugin_models.GetApp_RouteSummary{
+				{
+					Host:   "app",
+					Domain: domain,
+				},
+				{
+					Host:   "foo-app",
+					Domain: domain,
+				},
+				{
+					Host:   "foo-app-b",
+					Domain: domain,
+				},
+			}
+			var status *AppStatus
+			app := plugin_models.GetAppModel{Routes: routes}
+			fakeCliConnection.GetAppReturns(app, nil)
 
-			fakeCliConnection.CliCommandWithoutTerminalOutputReturns(cfAppOutput, nil)
-
-			var status AppStatus
 			status, _ = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app1")
 			Expect(len(status.routes)).To(Equal(3))
 			Expect(status.routes[0]).To(Equal("app.cfapps.io"))
@@ -240,8 +272,8 @@ var _ = Describe("Scaleover", func() {
 			var app2 = &AppStatus{
 				routes: []string{"c.d.e", "d.e.f"},
 			}
-			scaleoverCmdPlugin.app1 = *app1
-			scaleoverCmdPlugin.app2 = *app2
+			scaleoverCmdPlugin.app1 = app1
+			scaleoverCmdPlugin.app2 = app2
 		})
 
 		It("should return false if the apps don't share a route", func() {

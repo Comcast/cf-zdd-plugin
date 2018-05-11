@@ -2,7 +2,7 @@
 Zero downtime deployment plugin for Cloud Foundry
 
 ### Requirements
-Initially built with Go [1.6.2](https://golang.org/dl/), and [CloudFoundry CLI v6.13](https://github.com/cloudfoundry/cli/releases). The below dependencies are also required.
+Currently built with Go [1.10.2](https://golang.org/dl/), and [CloudFoundry CLI v6.36.1](https://github.com/cloudfoundry/cli/releases). The below dependencies are also required.
 ```
 go get github.com/cloudfoundry/cli/plugin
 go get github.com/onsi/ginkgo

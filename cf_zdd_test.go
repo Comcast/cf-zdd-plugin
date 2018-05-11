@@ -17,7 +17,7 @@
 package main_test
 
 import (
-	"github.com/cloudfoundry/cli/plugin"
+	"code.cloudfoundry.org/cli/plugin"
 	. "github.com/comcast/cf-zdd-plugin"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

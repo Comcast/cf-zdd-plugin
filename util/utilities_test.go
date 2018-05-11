@@ -19,7 +19,7 @@ package util_test
 import (
 	"errors"
 
-	"github.com/cloudfoundry/cli/plugin/pluginfakes"
+	"code.cloudfoundry.org/cli/plugin/pluginfakes"
 	. "github.com/comcast/cf-zdd-plugin/util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

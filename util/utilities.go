@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/cloudfoundry/cli/plugin"
+	"code.cloudfoundry.org/cli/plugin"
 )
 
 //Utilities - interface

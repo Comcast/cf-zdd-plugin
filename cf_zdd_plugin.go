@@ -19,12 +19,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/cloudfoundry/cli/plugin"
-	"github.com/comcast/cf-zdd-plugin/canarydeploy"
-	"github.com/comcast/cf-zdd-plugin/canarypromote"
-	"github.com/comcast/cf-zdd-plugin/canaryrepo"
-	"github.com/comcast/cf-zdd-plugin/scaleover"
-	"github.com/comcast/cf-zdd-plugin/zdddeploy"
+	"code.cloudfoundry.org/cli/plugin"
+	"github.com/comcast/cf-zdd-plugin/commands"
+	"strconv"
 )
 
 // constants
@@ -38,10 +35,13 @@ const (
 
 // var - exported vars
 var (
-	CanaryDeployCmdName  = canarydeploy.CanaryDeployCmdName
-	CanaryPromoteCmdName = canarypromote.CanaryPromoteCmdName
-	ZddDeployCmdName     = zdddeploy.ZddDeployCmdName
-	ScaleoverCmdName     = scaleover.ScaleoverCmdName
+	CanaryDeployCmdName  = commands.CanaryDeployCmdName
+	CanaryPromoteCmdName = commands.CanaryPromoteCmdName
+	ZddDeployCmdName     = commands.ZddDeployCmdName
+	ScaleoverCmdName     = commands.ScaleoverCmdName
+	Major                string
+	Minor                string
+	Patch                string
 )
 
 // CfZddCmd - struct to initialize.
@@ -49,12 +49,17 @@ type CfZddCmd struct{}
 
 //GetMetadata - required method to implement plugin
 func (CfZddCmd) GetMetadata() plugin.PluginMetadata {
+
+	major, _ := strconv.Atoi(Major)
+	minor, _ := strconv.Atoi(Minor)
+	patch, _ := strconv.Atoi(Patch)
+
 	return plugin.PluginMetadata{
 		Name: PluginName,
 		Version: plugin.VersionType{
-			Major: 1,
-			Minor: 2,
-			Build: 1,
+			Major: major,
+			Minor: minor,
+			Build: patch,
 		},
 		Commands: []plugin.Command{
 			{
@@ -78,8 +83,8 @@ func (CfZddCmd) GetMetadata() plugin.PluginMetadata {
 }
 
 //GetPluginRunnable - function to return runnable.
-func GetPluginRunnable(args []string) (pluginRunnable canaryrepo.PluginRunnable) {
-	pluginRunnable = canaryrepo.GetRegistry()[args[0]]
+func GetPluginRunnable(args []string) (pluginRunnable commands.CommandRunnable) {
+	pluginRunnable = commands.GetRegistry()[args[0]]
 	pluginRunnable.SetArgs(args)
 	return
 }
@@ -91,7 +96,6 @@ func main() {
 
 // Run - required method to implement plugin.
 func (cmd CfZddCmd) Run(cliConnection plugin.CliConnection, args []string) {
-
 	if err := GetPluginRunnable(args).Run(cliConnection); err != nil {
 		fmt.Printf("Caught panic: %s", err.Error())
 		panic(err)

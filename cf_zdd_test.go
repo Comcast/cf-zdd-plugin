@@ -23,13 +23,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("CfZddCmd", func() {
+var _ = Describe("CfZddPlugin", func() {
 
 	Describe(".GetMetaData", func() {
 		var pluginMetadata plugin.PluginMetadata
 		Context("when calling GetMetaData", func() {
 			BeforeEach(func() {
-				pluginMetadata = new(CfZddCmd).GetMetadata()
+				pluginMetadata = new(CfZddPlugin).GetMetadata()
 			})
 			It("should return the correct help text", func() {
 				success := false

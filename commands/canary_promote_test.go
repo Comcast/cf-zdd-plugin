@@ -23,12 +23,21 @@ var _ = Describe("canaryPromote", func() {
 				ctrlApp        plugin_models.GetAppModel
 				fakeConnection *pluginfakes.FakeCliConnection
 				canaryPromote  *CanaryPromote
+				cfZddCmd       *CfZddCmd
 			)
 			BeforeEach(func() {
 				fakeConnection = new(pluginfakes.FakeCliConnection)
-				canaryPromote = &CanaryPromote{
-					CliConnection: fakeConnection,
+				cfZddCmd = &CfZddCmd{
+					CmdName:         "deploy-canary",
+					NewApp:          "myTestApp1.2.3#abcd",
+					ManifestPath:    "../fixtures/manifest.yml",
+					ApplicationPath: "application.jar",
+					Conn:            fakeConnection,
 				}
+
+				canaryPromote = &CanaryPromote{}
+				canaryPromote.SetArgs(cfZddCmd)
+
 				ctrlApp = plugin_models.GetAppModel{
 					Name: "ars-generic#0.1.1.8-5d1bef",
 				}
@@ -45,6 +54,7 @@ var _ = Describe("canaryPromote", func() {
 		var (
 			fakeConnection *pluginfakes.FakeCliConnection
 			canaryPromote  *CanaryPromote
+			cfZddCmd       *CfZddCmd
 
 			app1 plugin_models.GetAppModel
 			app2 plugin_models.GetAppModel
@@ -74,9 +84,15 @@ var _ = Describe("canaryPromote", func() {
 					},
 				}
 				fakeConnection = new(pluginfakes.FakeCliConnection)
-				canaryPromote = &CanaryPromote{
-					CliConnection: fakeConnection,
+				cfZddCmd = &CfZddCmd{
+					CmdName:         "deploy-canary",
+					NewApp:          "myTestApp1.2.3#abcd",
+					ManifestPath:    "../fixtures/manifest.yml",
+					ApplicationPath: "application.jar",
+					Conn:            fakeConnection,
 				}
+				canaryPromote = &CanaryPromote{}
+				canaryPromote.SetArgs(cfZddCmd)
 			})
 			It("map route should map app1 routes to app2", func() {
 				err := canaryPromote.UpdateRoutes(app1, app2)

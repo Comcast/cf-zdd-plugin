@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"code.cloudfoundry.org/cli/plugin"
 	"github.com/comcast/cf-zdd-plugin/util"
 
 	"gopkg.in/yaml.v2"
@@ -14,9 +13,8 @@ import (
 
 // CanaryDeploy - struct
 type CanaryDeploy struct {
-	Utils         util.Utilities
-	cliConnection plugin.CliConnection
-	args          []string
+	Utils util.Utilities
+	args  *CfZddCmd
 }
 
 // DomainList - struct
@@ -27,9 +25,7 @@ type DomainList struct {
 
 // CanaryDeployCmdName - constants
 const (
-	CanaryDeployCmdName  = "deploy-canary"
-	CanaryRouteSuffix    = "canary"
-	CanaryRouteSeparator = "-"
+	CanaryDeployCmdName = "deploy-canary"
 )
 
 func init() {
@@ -37,8 +33,7 @@ func init() {
 }
 
 // Run - Run method
-func (s *CanaryDeploy) Run(conn plugin.CliConnection) (err error) {
-	s.cliConnection = conn
+func (s *CanaryDeploy) Run() (err error) {
 	if s.Utils == nil {
 		s.Utils = new(util.Utility)
 	}
@@ -48,31 +43,31 @@ func (s *CanaryDeploy) Run(conn plugin.CliConnection) (err error) {
 }
 
 // SetArgs - set command args
-func (s *CanaryDeploy) SetArgs(args []string) {
+func (s *CanaryDeploy) SetArgs(args *CfZddCmd) {
 	s.args = args
 }
 
 // DeployCanary - function to create and push a canary deployment
 func (s *CanaryDeploy) deploy() (err error) {
-	appName := s.args[1]
+	appName := s.args.NewApp
 
-	deployArgs := append([]string{"push"}, s.args[1:]...)
+	deployArgs := []string{"push", appName, "-f", s.args.ManifestPath, "-p", s.args.ApplicationPath}
 	deployArgsNoroute := append(deployArgs, "-i", "1", "--no-route", "--no-start")
 
 	fmt.Printf("Calling with deploy args: %v\n", deployArgsNoroute)
-	_, err = s.cliConnection.CliCommand(deployArgsNoroute...)
+	_, err = s.args.Conn.CliCommand(deployArgsNoroute...)
 
 	domains := s.getDomain()
 	for _, val := range domains {
 		deployArgsMapRoute := []string{"map-route", appName, val, "-n", CreateCanaryRouteName(appName)}
 		fmt.Printf("Calling with deploy args: %v\n", deployArgsMapRoute)
-		_, err = s.cliConnection.CliCommand(deployArgsMapRoute...)
+		_, err = s.args.Conn.CliCommand(deployArgsMapRoute...)
 	}
 	if err != nil {
-
+		fmt.Println(err.Error())
 	}
 	startArgs := []string{"start", appName}
-	_, err = s.cliConnection.CliCommand(startArgs...)
+	_, err = s.args.Conn.CliCommand(startArgs...)
 
 	return
 }
@@ -87,33 +82,24 @@ func CreateCanaryRouteName(appname string) (routename string) {
 
 func (s *CanaryDeploy) getDomain() (domains []string) {
 
-	// check for file exists
-	var manifestIndex = -1
-	for idx, val := range s.args {
-		if val == "-f" {
-			manifestIndex = idx + 1
-			fmt.Printf("Found manifest at index +%v\n", manifestIndex)
-			break
-		}
-	}
 	var yamlFile []byte
 	var err error
-	if manifestIndex != -1 {
-		if _, err = os.Stat(s.args[manifestIndex]); err == nil {
-			fmt.Printf("Reading manifest file at %s\n", s.args[manifestIndex])
-			yamlFile, err = ioutil.ReadFile(s.args[manifestIndex])
-			if err != nil {
-				fmt.Printf("###ERROR: %s\n", err.Error())
-				domains = []string{s.Utils.GetDefaultDomain(s.cliConnection)}
-			}
+
+	// check for file exists
+	if s.args.ManifestPath != "" {
+		fmt.Printf("Reading manifest file at %s\n", s.args.ManifestPath)
+		yamlFile, err = ioutil.ReadFile(s.args.ManifestPath)
+		if err != nil {
+			fmt.Printf("###ERROR: %s\n", err.Error())
+			domains = []string{s.Utils.GetDefaultDomain(s.args.Conn)}
 		}
-	} else {
+	} else if _, err = os.Stat("manifest.yml"); err == nil {
 		fmt.Println("Reading default manifest file")
 		yamlFile, err = ioutil.ReadFile("manifest.yml")
 
 		if err != nil {
 			fmt.Printf("###ERROR: %s\n", err.Error())
-			domains = []string{s.Utils.GetDefaultDomain(s.cliConnection)}
+			domains = []string{s.Utils.GetDefaultDomain(s.args.Conn)}
 		}
 	}
 
@@ -139,7 +125,7 @@ func (s *CanaryDeploy) getDomain() (domains []string) {
 	}
 	if len(domains) <= 0 {
 		fmt.Println("Domains are empty, calling default")
-		domains = []string{s.Utils.GetDefaultDomain(s.cliConnection)}
+		domains = []string{s.Utils.GetDefaultDomain(s.args.Conn)}
 	}
 	fmt.Printf("Domains: %v", domains)
 	return

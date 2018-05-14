@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"code.cloudfoundry.org/cli/plugin"
+	"flag"
 	"github.com/comcast/cf-zdd-plugin/commands"
 	"strconv"
 )
@@ -44,11 +45,13 @@ var (
 	Patch                string
 )
 
-// CfZddCmd - struct to initialize.
-type CfZddCmd struct{}
+// CfZddPlugin - struct to initialize.
+type CfZddPlugin struct {
+	cmd *commands.CfZddCmd
+}
 
 //GetMetadata - required method to implement plugin
-func (CfZddCmd) GetMetadata() plugin.PluginMetadata {
+func (c *CfZddPlugin) GetMetadata() plugin.PluginMetadata {
 
 	major, _ := strconv.Atoi(Major)
 	minor, _ := strconv.Atoi(Minor)
@@ -83,33 +86,52 @@ func (CfZddCmd) GetMetadata() plugin.PluginMetadata {
 }
 
 //GetPluginRunnable - function to return runnable.
-func GetPluginRunnable(args []string) (pluginRunnable commands.CommandRunnable) {
-	pluginRunnable = commands.GetRegistry()[args[0]]
-	pluginRunnable.SetArgs(args)
+func (c *CfZddPlugin) GetPluginRunnable(args []string) (pluginRunnable commands.CommandRunnable) {
+	pluginRunnable = commands.GetRegistry()[c.cmd.CmdName]
+	pluginRunnable.SetArgs(c.cmd)
 	return
 }
 
 // main - entry point to the plugin
 func main() {
-	plugin.Start(&CfZddCmd{})
+	plugin.Start(new(CfZddPlugin))
 }
 
 // Run - required method to implement plugin.
-func (cmd CfZddCmd) Run(cliConnection plugin.CliConnection, args []string) {
-	if err := GetPluginRunnable(args).Run(cliConnection); err != nil {
+func (c *CfZddPlugin) Run(cliConnection plugin.CliConnection, args []string) {
+
+	fs := flag.NewFlagSet(args[0], flag.ExitOnError)
+
+	fmt.Printf("ARGS: %+v\n", args)
+
+	app1Flag := fs.String("old-app", "", "current application name")
+	app2Flag := fs.String("new-app", "", "new application being deployed")
+	durationflag := fs.String("duration", "", "time between scalovers")
+	applicationPathflag := fs.String("p", "", "path to applcation file")
+	manifestPathFlag := fs.String("f", "", "path to application manifest")
+	customURLFlag := fs.String("custom-health-url", "", "path to custom healthcheck page")
+	batchSizeFlag := fs.Int("batch-size", 1, "number to restart/deploy at a time")
+	routeCheckFlag := fs.Bool("no-route-check", false, "check to ensure a common route")
+
+	fs.Parse(args[1:])
+
+	c.cmd = &commands.CfZddCmd{
+		OldApp:          *app1Flag,
+		NewApp:          *app2Flag,
+		CmdName:         args[0],
+		Conn:            cliConnection,
+		Duration:        *durationflag,
+		ApplicationPath: *applicationPathflag,
+		ManifestPath:    *manifestPathFlag,
+		CustomURL:       *customURLFlag,
+		BatchSize:       *batchSizeFlag,
+		RouteCheck:      *routeCheckFlag,
+	}
+
+	fmt.Printf("Captured Args: %+v\n", c.cmd)
+
+	if err := c.GetPluginRunnable(args).Run(); err != nil {
 		fmt.Printf("Caught panic: %s", err.Error())
 		panic(err)
-	}
-}
-
-// ApplicationRepo - wrapper struct
-type ApplicationRepo struct {
-	conn plugin.CliConnection
-}
-
-// NewApplicationRepo - wrapper for cf cliConnection
-func NewApplicationRepo(conn plugin.CliConnection) *ApplicationRepo {
-	return &ApplicationRepo{
-		conn: conn,
 	}
 }

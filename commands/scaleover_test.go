@@ -32,14 +32,18 @@ var _ = Describe("Scaleover", func() {
 
 		BeforeEach(func() {
 			fakeCliConnection = &pluginfakes.FakeCliConnection{}
-			scaleoverCmdPlugin = &ScaleoverCmd{}
+			scaleoverCmdPlugin = &ScaleoverCmd{
+				Args: &CfZddCmd{
+					Conn: fakeCliConnection,
+				},
+			}
 		})
 
 		It("should Fail Without App 1", func() {
 			app := plugin_models.GetAppModel{}
 			fakeCliConnection.GetAppReturns(app, errors.New("App app1 not found"))
 			var err error
-			_, err = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app1")
+			_, err = scaleoverCmdPlugin.GetAppStatus("app1")
 			Expect(err.Error()).To(Equal("App app1 not found"))
 		})
 
@@ -47,7 +51,7 @@ var _ = Describe("Scaleover", func() {
 			app := plugin_models.GetAppModel{}
 			fakeCliConnection.GetAppReturns(app, errors.New("App app2 not found"))
 			var err error
-			_, err = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app2")
+			_, err = scaleoverCmdPlugin.GetAppStatus("app2")
 			Expect(err.Error()).To(Equal("App app2 not found"))
 		})
 
@@ -56,12 +60,12 @@ var _ = Describe("Scaleover", func() {
 			fakeCliConnection.GetAppReturns(app, nil)
 
 			var status *AppStatus
-			status, _ = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app1")
+			status, _ = scaleoverCmdPlugin.GetAppStatus("app1")
 
-			Expect(status.name).To(Equal("app1"))
-			Expect(status.countRequested).To(Equal(0))
-			Expect(status.countRunning).To(Equal(0))
-			Expect(status.state).To(Equal("stopped"))
+			Expect(status.Name).To(Equal("app1"))
+			Expect(status.CountRequested).To(Equal(0))
+			Expect(status.CountRunning).To(Equal(0))
+			Expect(status.State).To(Equal("stopped"))
 		})
 
 		It("should start a started app with 10 instances", func() {
@@ -75,12 +79,12 @@ var _ = Describe("Scaleover", func() {
 			fakeCliConnection.GetAppReturns(cfApp, nil)
 
 			var status *AppStatus
-			status, _ = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app1")
+			status, _ = scaleoverCmdPlugin.GetAppStatus("app1")
 
-			Expect(status.name).To(Equal("app1"))
-			Expect(status.countRequested).To(Equal(10))
-			Expect(status.countRunning).To(Equal(10))
-			Expect(status.state).To(Equal("started"))
+			Expect(status.Name).To(Equal("app1"))
+			Expect(status.CountRequested).To(Equal(10))
+			Expect(status.CountRunning).To(Equal(10))
+			Expect(status.State).To(Equal("started"))
 		})
 
 		It("should keep a stop app stopped with 10 instances", func() {
@@ -93,12 +97,12 @@ var _ = Describe("Scaleover", func() {
 			fakeCliConnection.GetAppReturns(cfApp, nil)
 
 			var status *AppStatus
-			status, _ = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app1")
+			status, _ = scaleoverCmdPlugin.GetAppStatus("app1")
 
-			Expect(status.name).To(Equal("app1"))
-			Expect(status.countRequested).To(Equal(0))
-			Expect(status.countRunning).To(Equal(0))
-			Expect(status.state).To(Equal("stopped"))
+			Expect(status.Name).To(Equal("app1"))
+			Expect(status.CountRequested).To(Equal(0))
+			Expect(status.CountRunning).To(Equal(0))
+			Expect(status.State).To(Equal("stopped"))
 		})
 
 		It("should populate the routes for an app with one url", func() {
@@ -111,9 +115,9 @@ var _ = Describe("Scaleover", func() {
 			var status *AppStatus
 			app := plugin_models.GetAppModel{Routes: routes}
 			fakeCliConnection.GetAppReturns(app, nil)
-			status, _ = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app1")
-			Expect(len(status.routes)).To(Equal(1))
-			Expect(status.routes[0]).To(Equal("app.cfapps.io"))
+			status, _ = scaleoverCmdPlugin.GetAppStatus("app1")
+			Expect(len(status.Routes)).To(Equal(1))
+			Expect(status.Routes[0]).To(Equal("app.cfapps.io"))
 		})
 
 		It("should populate the routes for an app with three urls", func() {
@@ -135,11 +139,11 @@ var _ = Describe("Scaleover", func() {
 			app := plugin_models.GetAppModel{Routes: routes}
 			fakeCliConnection.GetAppReturns(app, nil)
 
-			status, _ = scaleoverCmdPlugin.getAppStatus(fakeCliConnection, "app1")
-			Expect(len(status.routes)).To(Equal(3))
-			Expect(status.routes[0]).To(Equal("app.cfapps.io"))
-			Expect(status.routes[1]).To(Equal("foo-app.cfapps.io"))
-			Expect(status.routes[2]).To(Equal("foo-app-b.cfapps.io"))
+			status, _ = scaleoverCmdPlugin.GetAppStatus("app1")
+			Expect(len(status.Routes)).To(Equal(3))
+			Expect(status.Routes[0]).To(Equal("app.cfapps.io"))
+			Expect(status.Routes[1]).To(Equal("foo-app.cfapps.io"))
+			Expect(status.Routes[2]).To(Equal("foo-app-b.cfapps.io"))
 		})
 
 	})
@@ -151,14 +155,14 @@ var _ = Describe("Scaleover", func() {
 
 		It("like a negative number", func() {
 			var err error
-			_, err = scaleoverCmdPlugin.parseTime("-1m")
+			_, err = scaleoverCmdPlugin.ParseTime("-1m")
 
 			Expect(err.Error()).To(Equal("Duration must be a positive number in the format of 1m"))
 		})
 
 		It("like zero", func() {
 			var t time.Duration
-			t, _ = scaleoverCmdPlugin.parseTime("0m")
+			t, _ = scaleoverCmdPlugin.ParseTime("0m")
 			one, _ := time.ParseDuration("0s")
 			Expect(t).To(Equal(one))
 		})
@@ -169,30 +173,30 @@ var _ = Describe("Scaleover", func() {
 
 		BeforeEach(func() {
 			appStatus = &AppStatus{
-				name:           "foo",
-				countRequested: 1,
-				countRunning:   1,
-				state:          "stopped",
+				Name:           "foo",
+				CountRequested: 1,
+				CountRunning:   1,
+				State:          "stopped",
 			}
 			fakeCliConnection = &pluginfakes.FakeCliConnection{}
 
 		})
 
 		It("Starts a stopped app", func() {
-			appStatus.scaleUp(fakeCliConnection)
-			Expect(appStatus.state).To(Equal("started"))
+			appStatus.ScaleUp(fakeCliConnection)
+			Expect(appStatus.State).To(Equal("started"))
 		})
 
 		It("It increments the amount requested", func() {
-			running := appStatus.countRunning
-			appStatus.scaleUp(fakeCliConnection)
-			Expect(appStatus.countRequested).To(Equal(running + 1))
+			running := appStatus.CountRunning
+			appStatus.ScaleUp(fakeCliConnection)
+			Expect(appStatus.CountRequested).To(Equal(running + 1))
 		})
 
 		It("Leaves a started app started", func() {
-			appStatus.state = "started"
-			appStatus.scaleUp(fakeCliConnection)
-			Expect(appStatus.state).To(Equal("started"))
+			appStatus.State = "started"
+			appStatus.ScaleUp(fakeCliConnection)
+			Expect(appStatus.State).To(Equal("started"))
 		})
 
 	})
@@ -202,105 +206,120 @@ var _ = Describe("Scaleover", func() {
 
 		BeforeEach(func() {
 			appStatus = &AppStatus{
-				name:           "foo",
-				countRequested: 1,
-				countRunning:   1,
-				state:          "started",
+				Name:           "foo",
+				CountRequested: 1,
+				CountRunning:   1,
+				State:          "started",
 			}
 			fakeCliConnection = &pluginfakes.FakeCliConnection{}
 
 		})
 
 		It("Stops a started app going to zero instances", func() {
-			appStatus.scaleDown(fakeCliConnection)
-			Expect(appStatus.state).To(Equal("stopped"))
+			appStatus.ScaleDown(fakeCliConnection)
+			Expect(appStatus.State).To(Equal("stopped"))
 		})
 
 		It("It decrements the amount requested", func() {
-			running := appStatus.countRunning
-			appStatus.scaleDown(fakeCliConnection)
-			Expect(appStatus.countRequested).To(Equal(running - 1))
+			running := appStatus.CountRunning
+			appStatus.ScaleDown(fakeCliConnection)
+			Expect(appStatus.CountRequested).To(Equal(running - 1))
 		})
 
 		It("Leaves a stopped app stopped", func() {
-			appStatus.state = "stopped"
-			appStatus.scaleDown(fakeCliConnection)
-			Expect(appStatus.state).To(Equal("stopped"))
+			appStatus.State = "stopped"
+			appStatus.ScaleDown(fakeCliConnection)
+			Expect(appStatus.State).To(Equal("stopped"))
 		})
 
 		It("Scales down the app", func() {
-			appStatus.countRequested = 2
-			appStatus.scaleDown(fakeCliConnection)
-			Expect(appStatus.countRunning).To(Equal(1))
+			appStatus.CountRequested = 2
+			appStatus.ScaleDown(fakeCliConnection)
+			Expect(appStatus.CountRunning).To(Equal(1))
 			Expect(fakeCliConnection.CliCommandWithoutTerminalOutputCallCount()).To(Equal(1))
 		})
 	})
 
 	Describe("Usage", func() {
 		BeforeEach(func() {
-			scaleoverCmdPlugin = &ScaleoverCmd{}
+			scaleoverCmdPlugin = &ScaleoverCmd{
+				Args: &CfZddCmd{
+					CmdName:         "scaleover",
+					NewApp:          "myTestApp1.2.3#abcd",
+					ManifestPath:    "../fixtures/manifest.yml",
+					ApplicationPath: "application.jar",
+					Duration:        "480s",
+					Conn:            new(pluginfakes.FakeCliConnection),
+				},
+			}
 		})
 
 		It("shows usage for too few arguments", func() {
-			Expect(scaleoverCmdPlugin.usage([]string{"scaleover"})).NotTo(BeNil())
-		})
-
-		It("shows usage for too many arguments", func() {
-			Expect(scaleoverCmdPlugin.usage([]string{"scaleover", "two", "three", "1m", "foo"})).NotTo(BeNil())
+			Expect(scaleoverCmdPlugin.Usage(scaleoverCmdPlugin.Args)).NotTo(BeNil())
 		})
 
 		It("is just right", func() {
-			Expect(scaleoverCmdPlugin.usage([]string{"scaleover", "two", "three", "1m"})).To(BeNil())
+			scaleoverCmdPlugin.Args.OldApp = "myTestApp1.2.3#abcd"
+			Expect(scaleoverCmdPlugin.Usage(scaleoverCmdPlugin.Args)).To(BeNil())
 		})
 
-		It("is okay with --no-route-check at the end", func() {
-			Expect(scaleoverCmdPlugin.usage([]string{"scaleover", "two", "three", "1m", "--no-route-check"})).To(BeNil())
+		It("is okay with duration set", func() {
+			scaleoverCmdPlugin.Args.OldApp = "myTestApp1.2.3#abcd"
+			Expect(scaleoverCmdPlugin.Usage(scaleoverCmdPlugin.Args)).To(BeNil())
 		})
 
-		It("is gives usage with --no-route-check in an unusual position", func() {
-			Expect(scaleoverCmdPlugin.usage([]string{"scaleover", "two", "--no-route-check", "three", "1m"})).ToNot(BeNil())
+		It("is not ok with duration and custom url not set", func() {
+			scaleoverCmdPlugin.Args.Duration = ""
+			Expect(scaleoverCmdPlugin.Usage(scaleoverCmdPlugin.Args)).ToNot(BeNil())
 		})
 
 	})
 
 	Describe("Routes", func() {
 		BeforeEach(func() {
-			scaleoverCmdPlugin = &ScaleoverCmd{}
+			cfZddCmd := &CfZddCmd{
+				RouteCheck: false,
+			}
+
+			scaleoverCmdPlugin = &ScaleoverCmd{
+				Args: cfZddCmd,
+			}
 			var app1 = &AppStatus{
-				routes: []string{"a.b.c", "b.c.d"},
+				Routes: []string{"a.b.c", "b.c.d"},
 			}
 			var app2 = &AppStatus{
-				routes: []string{"c.d.e", "d.e.f"},
+				Routes: []string{"c.d.e", "d.e.f"},
 			}
-			scaleoverCmdPlugin.app1 = app1
-			scaleoverCmdPlugin.app2 = app2
+			scaleoverCmdPlugin.App1 = app1
+			scaleoverCmdPlugin.App2 = app2
 		})
 
 		It("should return false if the apps don't share a route", func() {
-			Expect(scaleoverCmdPlugin.appsShareARoute()).To(BeFalse())
+			Expect(scaleoverCmdPlugin.AppsShareARoute()).To(BeFalse())
 		})
 
 		It("should return true when they share a route", func() {
-			scaleoverCmdPlugin.app2 = scaleoverCmdPlugin.app1
-			Expect(scaleoverCmdPlugin.appsShareARoute()).To(BeTrue())
+			scaleoverCmdPlugin.App2 = scaleoverCmdPlugin.App1
+			Expect(scaleoverCmdPlugin.AppsShareARoute()).To(BeTrue())
 		})
 
 		It("Should warn when apps don't share a route", func() {
-			Expect(scaleoverCmdPlugin.errorIfNoSharedRoute().Error()).To(Equal("Apps do not share a route!"))
+			Expect(scaleoverCmdPlugin.ErrorIfNoSharedRoute().Error()).To(Equal("Apps do not share a route!"))
 		})
 
 		It("Should be just fine if apps share a route", func() {
-			scaleoverCmdPlugin.app2.routes = append(scaleoverCmdPlugin.app2.routes, "a.b.c")
-			Expect(scaleoverCmdPlugin.errorIfNoSharedRoute()).To(BeNil())
+			scaleoverCmdPlugin.App2.Routes = append(scaleoverCmdPlugin.App2.Routes, "a.b.c")
+			Expect(scaleoverCmdPlugin.ErrorIfNoSharedRoute()).To(BeNil())
 		})
 
 		It("Should ignore route sanity if --no-route-check is at the end of args", func() {
-			enforceRoutes := scaleoverCmdPlugin.shouldEnforceRoutes([]string{"scaleover", "two", "three", "1m", "--no-route-check"})
+			enforceRoutes := scaleoverCmdPlugin.ShouldEnforceRoutes()
 			Expect(enforceRoutes).To(BeFalse())
 		})
 
 		It("Should carfuly consider routes if --no-route-check is not in the args", func() {
-			enforceRoutes := scaleoverCmdPlugin.shouldEnforceRoutes([]string{"scaleover", "two", "three", "1m"})
+			scaleoverCmdPlugin.Args.RouteCheck = true
+			enforceRoutes := scaleoverCmdPlugin.ShouldEnforceRoutes()
 			Expect(enforceRoutes).To(BeTrue())
 		})
 

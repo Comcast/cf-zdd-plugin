@@ -4,14 +4,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"code.cloudfoundry.org/cli/plugin"
 )
 
 // ZddDeploy - struct
 type ZddDeploy struct {
-	cliConnection plugin.CliConnection
-	args          []string
+	args *CfZddCmd
 }
 
 // ZddDeployCmdName - constants
@@ -24,32 +21,29 @@ func init() {
 }
 
 // Run method
-func (s *ZddDeploy) Run(conn plugin.CliConnection) (err error) {
-	s.cliConnection = conn
+func (s *ZddDeploy) Run() (err error) {
 	err = s.deploy()
 	return
 }
 
 // SetArgs - arg setter
-func (s *ZddDeploy) SetArgs(args []string) {
+func (s *ZddDeploy) SetArgs(args *CfZddCmd) {
 	s.args = args
 }
 
 func (s *ZddDeploy) deploy() (err error) {
 	var (
-		venerable     string
-		scaleovertime string
-		apps          []string
+		venerable string
+		apps      []string
 	)
 
-	appName := s.args[1]
-	manifestPath := s.args[3]
-	artifactPath := s.args[5]
+	appName := s.args.NewApp
+	manifestPath := s.args.ManifestPath
+	artifactPath := s.args.ApplicationPath
 
-	if len(s.args) == 7 {
-		scaleovertime = s.args[6]
-	} else {
-		scaleovertime = "480s"
+	fmt.Printf("Calling zdd-deploy with args App2=%s, manifestPath=%s, artifactPath=%s\n", appName, manifestPath, artifactPath)
+	if s.args.Duration == "" {
+		s.args.Duration = "480s"
 	}
 
 	//Get the application list from cf
@@ -59,37 +53,40 @@ func (s *ZddDeploy) deploy() (err error) {
 	// Check if new deployment and deploy
 	if apps == nil {
 		fmt.Printf("Initial deployment of %s\n", appName)
-		deployArgs := append([]string{"push"}, s.args[1:6]...)
-		_, err = s.cliConnection.CliCommand(deployArgs...)
+		deployArgs := []string{"push", s.args.NewApp, "-f", s.args.ManifestPath, "-p", s.args.ApplicationPath}
+		_, err = s.args.Conn.CliCommand(deployArgs...)
 	} else {
 		//Check if redeployment and rename old app.
-		if isAppDeployed(apps, appName) == true {
+		if isAppDeployed(apps, appName) {
 			venerable = strings.Join([]string{appName, "venerable"}, "-")
 			renameArgs := []string{"rename", appName, venerable}
-			_, err = s.cliConnection.CliCommand(renameArgs...)
+			_, err = s.args.Conn.CliCommand(renameArgs...)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
 		} else {
 			venerable = apps[0]
 		}
 		fmt.Printf("Venerable version assigned to %s\n", venerable)
 		//Push new copy of the app with no-start
 		deployArgs := []string{"push", appName, "-f", manifestPath, "-p", artifactPath, "-i", "1", "--no-start"}
-		_, err = s.cliConnection.CliCommand(deployArgs...)
-
+		_, err = s.args.Conn.CliCommand(deployArgs...)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
 		// Do the scaleover
-		scaleovercmdArgs := []string{"scaleover", venerable, appName, scaleovertime}
-		fmt.Printf("Scaleover args: %v\n", scaleovercmdArgs)
+		s.args.OldApp = venerable
 		scaleovercmd := &ScaleoverCmd{
-			CliConnection: s.cliConnection,
-			Args:          scaleovercmdArgs,
+			Args: s.args,
 		}
 		if err = scaleovercmd.ScaleoverCommand(); err != nil {
-			fmt.Printf(err.Error())
+			fmt.Println(err.Error())
 			os.Exit(1)
 		}
 
 		fmt.Printf("Removing app: %s\n", venerable)
 		removeOldAppArgs := []string{"delete", venerable, "-f"}
-		_, err = s.cliConnection.CliCommand(removeOldAppArgs...)
+		_, err = s.args.Conn.CliCommand(removeOldAppArgs...)
 	}
 
 	return
@@ -98,7 +95,7 @@ func (s *ZddDeploy) deploy() (err error) {
 func (s *ZddDeploy) getDeployedApplications(appName string) []string {
 	var applist []string
 	shortName := strings.Split(appName, "#")[0]
-	if output, err := s.cliConnection.GetApps(); err == nil {
+	if output, err := s.args.Conn.GetApps(); err == nil {
 		for _, entry := range output {
 			if strings.HasPrefix(entry.Name, shortName) {
 				applist = append(applist, entry.Name)

@@ -37,7 +37,7 @@ var _ = Describe(".Help", func() {
 		})
 		Context("when called with a valid subcommand", func() {
 			BeforeEach(func() {
-				cfZddCmd.HelpTopic = blueGreenCmdName
+				cfZddCmd.HelpTopic = BlueGreenCmdName
 			})
 			It("should return the appropriate help", func() {
 				err = helpCmd.Run()

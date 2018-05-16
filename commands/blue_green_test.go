@@ -12,7 +12,7 @@ var _ = Describe(".BlueGreenDeploy", func() {
 	Describe(".init", func() {
 		Context("when the package is imported", func() {
 			It("should then be registered with the command repo", func() {
-				_, ok := GetRegistry()[blueGreenCmdName]
+				_, ok := GetRegistry()[BlueGreenCmdName]
 				Expect(ok).Should(BeTrue())
 			})
 		})
@@ -27,7 +27,7 @@ var _ = Describe(".BlueGreenDeploy", func() {
 		BeforeEach(func() {
 			fakeConnection = new(pluginfakes.FakeCliConnection)
 			cfZddCmd = &CfZddCmd{
-				CmdName:         blueGreenCmdName,
+				CmdName:         BlueGreenCmdName,
 				NewApp:          "myTestApp#1.2.3-abcde",
 				ManifestPath:    "../fixtures/manifest.yml",
 				ApplicationPath: "application.jar",

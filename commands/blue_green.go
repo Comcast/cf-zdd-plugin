@@ -12,10 +12,10 @@ type BlueGreenDeploy struct {
 	args *CfZddCmd
 }
 
-const blueGreenCmdName = "blue-green"
+const BlueGreenCmdName = "blue-green"
 
 func init() {
-	Register(blueGreenCmdName, new(BlueGreenDeploy))
+	Register(BlueGreenCmdName, new(BlueGreenDeploy))
 }
 
 // Run - run method as required by the interface

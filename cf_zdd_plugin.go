@@ -32,6 +32,7 @@ const (
 	ZddDeployHelpText     = "ZDD deployment using scale-over plugin"
 	ScaleoverHelpText     = "Scalesover one application version to another"
 	HelpText              = "Help is available for each of the commands in the form 'help <command name>'"
+	BlueGreenHelpText     = "Deploys an application and then flips the route to the new application"
 	PluginName            = "cf-zero-downtime-deployment"
 )
 
@@ -42,6 +43,7 @@ var (
 	ZddDeployCmdName     = commands.ZddDeployCmdName
 	ScaleoverCmdName     = commands.ScaleoverCmdName
 	HelpCmdName          = commands.HelpCommandName
+	BlueGreenCmdName     = commands.BlueGreenCmdName
 	Major                string
 	Minor                string
 	Patch                string
@@ -82,6 +84,10 @@ func (c *CfZddPlugin) GetMetadata() plugin.PluginMetadata {
 			{
 				Name:     ScaleoverCmdName,
 				HelpText: ScaleoverHelpText,
+			},
+			{
+				Name:     BlueGreenCmdName,
+				HelpText: BlueGreenHelpText,
 			},
 			{
 				Name:     HelpCmdName,

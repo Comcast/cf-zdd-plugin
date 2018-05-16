@@ -39,7 +39,7 @@ func (bg *BlueGreenDeploy) deploy() (err error) {
 
 	if !bg.isApplicationDeployed(applicationToDeploy) {
 		fmt.Println("Application is not deployed.... pushing.")
-		err = bg.pushApplication(applicationToDeploy, artifactPath, manifestPath)
+		err = bg.pushApplication(applicationToDeploy, artifactPath, manifestPath, false)
 	} else {
 		fmt.Println("Application is deployed, renaming existing version")
 		venerable := strings.Join([]string{applicationToDeploy, "venerable"}, "-")
@@ -50,7 +50,7 @@ func (bg *BlueGreenDeploy) deploy() (err error) {
 		}
 
 		fmt.Printf("Pushing new version with name: %s\n", applicationToDeploy)
-		if err = bg.pushApplication(applicationToDeploy, artifactPath, manifestPath); err != nil {
+		if err = bg.pushApplication(applicationToDeploy, artifactPath, manifestPath, true); err != nil {
 			fmt.Println(err.Error())
 			return
 		}
@@ -84,8 +84,12 @@ func (bg *BlueGreenDeploy) isApplicationDeployed(appName string) bool {
 	return false
 }
 
-func (bg *BlueGreenDeploy) pushApplication(appName string, artifactPath string, manifestPath string) error {
-	deployArgs := []string{"push", appName, "-f", manifestPath, "-p", artifactPath, "--no-route"}
+func (bg *BlueGreenDeploy) pushApplication(appName string, artifactPath string, manifestPath string, isDeployed bool) error {
+	deployArgs := []string{"push", appName, "-f", manifestPath, "-p", artifactPath}
+
+	if !isDeployed {
+		deployArgs = append(deployArgs, "--no-route")
+	}
 
 	if _, err := bg.args.Conn.CliCommand(deployArgs...); err != nil {
 		fmt.Println(err.Error())

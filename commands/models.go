@@ -14,6 +14,7 @@ type CfZddCmd struct {
 	CustomURL       string
 	BatchSize       int
 	RouteCheck      bool
+	HelpTopic       string
 }
 
 // const - exported constants

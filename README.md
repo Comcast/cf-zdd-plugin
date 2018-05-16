@@ -1,10 +1,13 @@
 # cf-zdd-plugin
 Zero downtime deployment plugin for Cloud Foundry
 
+### Assets  
+Binaries are available for download in the [releases](https://github.com/Comcast/cf-zdd-plugin/releases) section of this respository.
+
 ### Requirements
 Currently built with Go [1.10.2](https://golang.org/dl/), and [CloudFoundry CLI v6.36.1](https://github.com/cloudfoundry/cli/releases). The below dependencies are also required.
 ```
-go get github.com/cloudfoundry/cli/plugin
+go get code.cloudfoundry.org/cli/plugin
 go get github.com/onsi/ginkgo
 go get github.com/onsi/gomega
 go get github.com/andrew-d/go-termutil
@@ -33,8 +36,8 @@ The method then leverages scaleover mechanism as described below.
 cf deploy-zdd myapplication -f path/to/manifest.yml -p path/to/application 15s
 ```
 **myapplication** - my application name  
-**-f** - path to application manifest  
-**-p** - path to deployable artifact
+**--f** - path to application manifest  
+**--p** - path to deployable artifact
 **15s** - duration in which to deploy application
 ### deploy-canary
 The deploy-canary method deploys a single instance of an application under a custom route that can then be tested against before calling the counterpart promote-canary below.  
@@ -65,3 +68,16 @@ cf scaleover app1 app2 15s
 **app1** - my old application  
 **app2** - my new application  
 **15s** - scaleover duration
+
+### blue-green
+Blue green deployment deploys your code and then remaps the route from the old to the new versions.  
+**Usage**  
+```jshelllanguage
+cf blue-green myapplication -f path/to/manifest.yml -p path/to/application
+```
+**--f** - path to application manifest  
+**--p** - path to deployable artifact  
+
+##TODO
+1. Remove opinions surrounding filenames and versions.
+2. Another pass at refactoring.

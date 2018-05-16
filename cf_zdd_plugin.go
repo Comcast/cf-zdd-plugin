@@ -31,6 +31,7 @@ const (
 	CanaryPromoteHelpText = "Performs a promotion on the canary"
 	ZddDeployHelpText     = "ZDD deployment using scale-over plugin"
 	ScaleoverHelpText     = "Scalesover one application version to another"
+	HelpText              = "Help is available for each of the commands in the form 'help <command name>'"
 	PluginName            = "cf-zero-downtime-deployment"
 )
 
@@ -40,6 +41,7 @@ var (
 	CanaryPromoteCmdName = commands.CanaryPromoteCmdName
 	ZddDeployCmdName     = commands.ZddDeployCmdName
 	ScaleoverCmdName     = commands.ScaleoverCmdName
+	HelpCmdName          = commands.HelpCommandName
 	Major                string
 	Minor                string
 	Patch                string
@@ -81,14 +83,20 @@ func (c *CfZddPlugin) GetMetadata() plugin.PluginMetadata {
 				Name:     ScaleoverCmdName,
 				HelpText: ScaleoverHelpText,
 			},
+			{
+				Name:     HelpCmdName,
+				HelpText: HelpText,
+			},
 		},
 	}
 }
 
 //GetPluginRunnable - function to return runnable.
-func (c *CfZddPlugin) GetPluginRunnable(args []string) (pluginRunnable commands.CommandRunnable) {
+func (c *CfZddPlugin) GetPluginRunnable() (pluginRunnable commands.CommandRunnable) {
 	pluginRunnable = commands.GetRegistry()[c.cmd.CmdName]
-	pluginRunnable.SetArgs(c.cmd)
+	if pluginRunnable != nil {
+		pluginRunnable.SetArgs(c.cmd)
+	}
 	return
 }
 
@@ -128,10 +136,11 @@ func (c *CfZddPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 		RouteCheck:      *routeCheckFlag,
 	}
 
-	fmt.Printf("Captured Args: %+v\n", c.cmd)
+	if args[0] == HelpCmdName && len(args) > 1 {
+		c.cmd.HelpTopic = args[1]
+	}
 
-	if err := c.GetPluginRunnable(args).Run(); err != nil {
-		fmt.Printf("Caught panic: %s", err.Error())
-		panic(err)
+	if pr := c.GetPluginRunnable(); pr != nil {
+		pr.Run()
 	}
 }

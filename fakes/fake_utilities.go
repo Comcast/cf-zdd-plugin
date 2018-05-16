@@ -20,7 +20,7 @@ package fakes
 import (
 	"sync"
 
-	"github.com/cloudfoundry/cli/plugin"
+	"code.cloudfoundry.org/cli/plugin"
 	"github.com/comcast/cf-zdd-plugin/util"
 )
 

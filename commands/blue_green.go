@@ -87,7 +87,7 @@ func (bg *BlueGreenDeploy) isApplicationDeployed(appName string) bool {
 func (bg *BlueGreenDeploy) pushApplication(appName string, artifactPath string, manifestPath string, isDeployed bool) error {
 	deployArgs := []string{"push", appName, "-f", manifestPath, "-p", artifactPath}
 
-	if !isDeployed {
+	if isDeployed {
 		deployArgs = append(deployArgs, "--no-route")
 	}
 

@@ -87,7 +87,7 @@ func (bg *BlueGreenDeploy) isApplicationDeployed(appName string) bool {
 func (bg *BlueGreenDeploy) pushApplication(appName string, artifactPath string, manifestPath string, isDeployed bool) error {
 	deployArgs := []string{"push", appName, "-f", manifestPath, "-p", artifactPath}
 
-	if !isDeployed {
+	if isDeployed {
 		deployArgs = append(deployArgs, "--no-route")
 	}
 
@@ -140,7 +140,7 @@ func (bg *BlueGreenDeploy) remapRoute(appName string, venerable string) error {
 
 	// Remove the route from the old app version
 	for _, route := range venerableModel.Routes {
-		drArgs := []string{"delete-route", route.Domain.Name, "-n", route.Host, "-f"}
+		drArgs := []string{"unmap-route", venerable, route.Domain.Name, "-n", route.Host, "-f"}
 		_, err = bg.args.Conn.CliCommand(drArgs...)
 		if err != nil {
 			fmt.Println(err.Error())

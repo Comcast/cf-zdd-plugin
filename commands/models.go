@@ -15,6 +15,8 @@ type CfZddCmd struct {
 	BatchSize       int
 	RouteCheck      bool
 	HelpTopic       string
+	BaseAppName     string
+	Commands        CommonCmd
 }
 
 // const - exported constants

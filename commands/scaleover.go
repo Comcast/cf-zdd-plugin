@@ -41,33 +41,32 @@ type AppStatus struct {
 	Routes         []string
 }
 
+type ScaleoverCommand interface {
+	DoScaleover() error
+	GetAppStatus(string) (*AppStatus, error)
+	ErrorIfNoSharedRoute() error
+	ParseTime(string) (time.Duration, error)
+	Usage(*CfZddCmd) error
+}
+
 //ScaleoverCmd is this plugin
-type ScaleoverCmd struct {
-	App1   *AppStatus
-	App2   *AppStatus
-	Args   *CfZddCmd
-	Client clientDoer
+type scaleoverCmd struct {
+	App1 *AppStatus
+	App2 *AppStatus
+	Args *CfZddCmd
 }
 
-// ScaleoverCmdName - constants
-const (
-	ScaleoverCmdName = "scaleover"
-)
-
-func init() {
-	Register(ScaleoverCmdName, new(ScaleoverCmd))
+func NewScaleoverCmd(args *CfZddCmd) ScaleoverCommand {
+	return &scaleoverCmd{
+		Args: args,
+	}
 }
 
-// SetArgs - arg setter
-func (cmd *ScaleoverCmd) SetArgs(args *CfZddCmd) {
-	cmd.Args = args
-}
-
-func (cmd *ScaleoverCmd) ShouldEnforceRoutes() bool {
+func (cmd *scaleoverCmd) ShouldEnforceRoutes() bool {
 	return cmd.Args.RouteCheck
 }
 
-func (cmd *ScaleoverCmd) ParseTime(duration string) (time.Duration, error) {
+func (cmd *scaleoverCmd) ParseTime(duration string) (time.Duration, error) {
 	var (
 		rolloverTime time.Duration
 		err          error
@@ -82,13 +81,7 @@ func (cmd *ScaleoverCmd) ParseTime(duration string) (time.Duration, error) {
 	return rolloverTime, nil
 }
 
-//Run runs the plugin
-func (cmd *ScaleoverCmd) Run() (err error) {
-	cmd.ScaleoverCommand()
-	return
-}
-
-func (cmd *ScaleoverCmd) Usage(args *CfZddCmd) error {
+func (cmd *scaleoverCmd) Usage(args *CfZddCmd) error {
 
 	if args.OldApp == "" || args.NewApp == "" {
 		return errors.New("App 1 and App2 are required")
@@ -102,7 +95,7 @@ func (cmd *ScaleoverCmd) Usage(args *CfZddCmd) error {
 }
 
 //ScaleoverCommand creates a new instance of this plugin
-func (cmd *ScaleoverCmd) ScaleoverCommand() (err error) {
+func (cmd *scaleoverCmd) DoScaleover() (err error) {
 	enforceRoutes := cmd.ShouldEnforceRoutes()
 
 	if err = cmd.Usage(cmd.Args); nil != err {
@@ -160,7 +153,7 @@ func (cmd *ScaleoverCmd) ScaleoverCommand() (err error) {
 	return
 }
 
-func (cmd *ScaleoverCmd) GetAppStatus(name string) (*AppStatus, error) {
+func (cmd *scaleoverCmd) GetAppStatus(name string) (*AppStatus, error) {
 	app, err := cmd.Args.Conn.GetApp(name)
 
 	if nil != err {
@@ -207,7 +200,7 @@ func (app *AppStatus) ScaleDown(cliConnection plugin.CliConnection) {
 	}
 }
 
-func (cmd *ScaleoverCmd) showStatus() {
+func (cmd *scaleoverCmd) showStatus() {
 	if termutil.Isatty(os.Stdout.Fd()) {
 		fmt.Printf("%s (%s) %s %s %s (%s) \r",
 			cmd.App1.Name,
@@ -229,7 +222,7 @@ func (cmd *ScaleoverCmd) showStatus() {
 	}
 }
 
-func (cmd *ScaleoverCmd) AppsShareARoute() bool {
+func (cmd *scaleoverCmd) AppsShareARoute() bool {
 	for _, r1 := range cmd.App1.Routes {
 		for _, r2 := range cmd.App2.Routes {
 			if r1 == r2 {
@@ -240,7 +233,7 @@ func (cmd *ScaleoverCmd) AppsShareARoute() bool {
 	return false
 }
 
-func (cmd *ScaleoverCmd) ErrorIfNoSharedRoute() error {
+func (cmd *scaleoverCmd) ErrorIfNoSharedRoute() error {
 	if cmd.AppsShareARoute() {
 		return nil
 	}

@@ -1,7 +1,22 @@
+/*
+* Copyright 2016 Comcast Cable Communications Management, LLC
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+* http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+ */
+
 package commands
 
 import (
-	"code.cloudfoundry.org/cli/plugin/models"
 	"fmt"
 	"strings"
 	"time"
@@ -37,20 +52,34 @@ func (bg *BlueGreenDeploy) deploy() (err error) {
 
 	fmt.Printf("Calling blue green deploy with args: Application=%s, manifestPath=%s, artifactPath=%s\n", applicationToDeploy, manifestPath, artifactPath)
 
-	if !bg.isApplicationDeployed(applicationToDeploy) {
+	var (
+		isAppDeployed bool
+		searchAppName string
+		oldAppName    string
+	)
+
+	// Verify if application is currently deployed and current name if app name is versioned
+	if bg.args.BaseAppName != "" {
+		searchAppName = bg.args.BaseAppName
+	} else {
+		searchAppName = applicationToDeploy
+	}
+
+	oldAppName, isAppDeployed = bg.args.Commands.IsApplicationDeployed(searchAppName)
+
+	if !isAppDeployed {
 		fmt.Println("Application is not deployed.... pushing.")
-		err = bg.pushApplication(applicationToDeploy, artifactPath, manifestPath, false)
+		err = bg.args.Commands.PushApplication(applicationToDeploy, artifactPath, manifestPath, "--no-route")
 	} else {
 		fmt.Println("Application is deployed, renaming existing version")
-		venerable := strings.Join([]string{applicationToDeploy, "venerable"}, "-")
-		renameArgs := []string{"rename", applicationToDeploy, venerable}
-		if _, err = bg.args.Conn.CliCommand(renameArgs...); err != nil {
+		venerable := strings.Join([]string{oldAppName, "venerable"}, "-")
+		if err = bg.args.Commands.RenameApplication(oldAppName, venerable); err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 
 		fmt.Printf("Pushing new version with name: %s\n", applicationToDeploy)
-		if err = bg.pushApplication(applicationToDeploy, artifactPath, manifestPath, true); err != nil {
+		if err = bg.args.Commands.PushApplication(applicationToDeploy, artifactPath, manifestPath, "--no-route"); err != nil {
 			fmt.Println(err.Error())
 			return
 		}
@@ -59,43 +88,17 @@ func (bg *BlueGreenDeploy) deploy() (err error) {
 			time.Sleep(20 * time.Second)
 		}
 		fmt.Println("All instances started, remapping route.")
-		if err = bg.remapRoute(applicationToDeploy, venerable); err != nil {
+		if err = bg.args.Commands.RemapRoutes(applicationToDeploy, venerable); err != nil {
 			fmt.Println(err.Error())
 		}
 
 		fmt.Println("Removing old version")
-		if err = bg.removeApplication(venerable); err != nil {
+		if err = bg.args.Commands.RemoveApplication(venerable); err != nil {
 			fmt.Println(err.Error())
 		}
 	}
 
 	return
-}
-
-func (bg *BlueGreenDeploy) isApplicationDeployed(appName string) bool {
-	if output, err := bg.args.Conn.GetApps(); err == nil {
-		for _, app := range output {
-			if appName == app.Name {
-				fmt.Println("Application is deployed")
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (bg *BlueGreenDeploy) pushApplication(appName string, artifactPath string, manifestPath string, isDeployed bool) error {
-	deployArgs := []string{"push", appName, "-f", manifestPath, "-p", artifactPath}
-
-	if isDeployed {
-		deployArgs = append(deployArgs, "--no-route")
-	}
-
-	if _, err := bg.args.Conn.CliCommand(deployArgs...); err != nil {
-		fmt.Println(err.Error())
-		return err
-	}
-	return nil
 }
 
 func (bg *BlueGreenDeploy) areAllInstancesStarted(appName string) bool {
@@ -105,46 +108,4 @@ func (bg *BlueGreenDeploy) areAllInstancesStarted(appName string) bool {
 		}
 	}
 	return false
-}
-
-func (bg *BlueGreenDeploy) removeApplication(appName string) error {
-	removeArgs := []string{"delete", appName, "-f"}
-
-	if _, err := bg.args.Conn.CliCommand(removeArgs...); err != nil {
-		fmt.Println(err.Error())
-		return err
-	}
-	return nil
-}
-
-func (bg *BlueGreenDeploy) remapRoute(appName string, venerable string) error {
-	//Get the routes associated with the old version
-	var (
-		err            error
-		venerableModel plugin_models.GetAppModel
-	)
-
-	venerableModel, err = bg.args.Conn.GetApp(venerable)
-	if err != nil {
-		return err
-	}
-
-	// Map the routes to the new application version
-	for _, route := range venerableModel.Routes {
-		mrArgs := []string{"map-route", appName, route.Domain.Name, "-n", route.Host}
-		_, err = bg.args.Conn.CliCommand(mrArgs...)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}
-
-	// Remove the route from the old app version
-	for _, route := range venerableModel.Routes {
-		drArgs := []string{"unmap-route", venerable, route.Domain.Name, "-n", route.Host}
-		_, err = bg.args.Conn.CliCommand(drArgs...)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}
-	return err
 }

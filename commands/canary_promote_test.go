@@ -1,8 +1,9 @@
-package commands
+package commands_test
 
 import (
 	"code.cloudfoundry.org/cli/plugin/models"
-	"code.cloudfoundry.org/cli/plugin/pluginfakes"
+	"github.com/comcast/cf-zdd-plugin/commands"
+	"github.com/comcast/cf-zdd-plugin/fakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -11,50 +12,53 @@ var _ = Describe("canaryPromote", func() {
 	Describe(".init", func() {
 		Context("when the package is imported", func() {
 			It("should then be registered with the canary repo", func() {
-				_, ok := GetRegistry()[CanaryPromoteCmdName]
+				_, ok := commands.GetRegistry()[commands.CanaryPromoteCmdName]
 				Ω(ok).Should(BeTrue())
 			})
 		})
 	})
 
-	Describe(".RemoveApplication", func() {
-		Context("when called with an application that exists", func() {
-			var (
-				ctrlApp        plugin_models.GetAppModel
-				fakeConnection *pluginfakes.FakeCliConnection
-				canaryPromote  *CanaryPromote
-				cfZddCmd       *CfZddCmd
-			)
+	Describe("Run", func() {
+		var (
+			fakeConnection *fakes.FakeCliConnection
+			canaryPromote  *commands.CanaryPromote
+			cfZddCmd       *commands.CfZddCmd
+			fakeScaleover  *fakes.FakeScaleoverCommand
+			fakeCommand    *fakes.FakeCommonCmd
+			err            error
+		)
+		Context("when called with a valid set of args", func() {
 			BeforeEach(func() {
-				fakeConnection = new(pluginfakes.FakeCliConnection)
-				cfZddCmd = &CfZddCmd{
-					CmdName:         "deploy-canary",
-					NewApp:          "myTestApp1.2.3#abcd",
-					ManifestPath:    "../fixtures/manifest.yml",
-					ApplicationPath: "application.jar",
-					Conn:            fakeConnection,
+				fakeConnection = new(fakes.FakeCliConnection)
+				fakeScaleover = new(fakes.FakeScaleoverCommand)
+				fakeCommand = new(fakes.FakeCommonCmd)
+
+				fakeScaleover.DoScaleoverReturns(nil)
+
+				cfZddCmd = &commands.CfZddCmd{
+					OldApp:   "app1",
+					NewApp:   "canary",
+					Conn:     fakeConnection,
+					Commands: fakeCommand,
 				}
 
-				canaryPromote = &CanaryPromote{}
+				canaryPromote = &commands.CanaryPromote{
+					ScaleoverCmd: fakeScaleover,
+				}
+
 				canaryPromote.SetArgs(cfZddCmd)
-
-				ctrlApp = plugin_models.GetAppModel{
-					Name: "ars-generic#0.1.1.8-5d1bef",
-				}
-				fakeConnection.CliCommandReturns([]string{"return"}, nil)
 			})
-
-			It("should remove the application", func() {
-				err := canaryPromote.RemoveApplication(ctrlApp)
+			It("should execute the promotion of the canary and not return an error", func() {
+				err = canaryPromote.Run()
 				Expect(err).ShouldNot(HaveOccurred())
 			})
 		})
 	})
 	Describe(".UpdateRoutes", func() {
 		var (
-			fakeConnection *pluginfakes.FakeCliConnection
-			canaryPromote  *CanaryPromote
-			cfZddCmd       *CfZddCmd
+			fakeConnection *fakes.FakeCliConnection
+			canaryPromote  *commands.CanaryPromote
+			cfZddCmd       *commands.CfZddCmd
 
 			app1 plugin_models.GetAppModel
 			app2 plugin_models.GetAppModel
@@ -83,15 +87,15 @@ var _ = Describe("canaryPromote", func() {
 						},
 					},
 				}
-				fakeConnection = new(pluginfakes.FakeCliConnection)
-				cfZddCmd = &CfZddCmd{
+				fakeConnection = new(fakes.FakeCliConnection)
+				cfZddCmd = &commands.CfZddCmd{
 					CmdName:         "deploy-canary",
 					NewApp:          "myTestApp1.2.3#abcd",
 					ManifestPath:    "../fixtures/manifest.yml",
 					ApplicationPath: "application.jar",
 					Conn:            fakeConnection,
 				}
-				canaryPromote = &CanaryPromote{}
+				canaryPromote = &commands.CanaryPromote{}
 				canaryPromote.SetArgs(cfZddCmd)
 			})
 			It("map route should map app1 routes to app2", func() {

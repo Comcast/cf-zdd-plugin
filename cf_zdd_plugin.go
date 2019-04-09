@@ -30,7 +30,6 @@ const (
 	CanaryDeployHelpText  = "Deploys an application with a canary route"
 	CanaryPromoteHelpText = "Performs a promotion on the canary"
 	ZddDeployHelpText     = "ZDD deployment using scale-over plugin"
-	ScaleoverHelpText     = "Scalesover one application version to another"
 	HelpText              = "Help is available for each of the commands in the form 'help <command name>'"
 	BlueGreenHelpText     = "Deploys an application and then flips the route to the new application"
 	PluginName            = "cf-zero-downtime-deployment"
@@ -41,7 +40,6 @@ var (
 	CanaryDeployCmdName  = commands.CanaryDeployCmdName
 	CanaryPromoteCmdName = commands.CanaryPromoteCmdName
 	ZddDeployCmdName     = commands.ZddDeployCmdName
-	ScaleoverCmdName     = commands.ScaleoverCmdName
 	HelpCmdName          = commands.HelpCommandName
 	BlueGreenCmdName     = commands.BlueGreenCmdName
 	Major                string
@@ -82,10 +80,6 @@ func (c *CfZddPlugin) GetMetadata() plugin.PluginMetadata {
 				HelpText: ZddDeployHelpText,
 			},
 			{
-				Name:     ScaleoverCmdName,
-				HelpText: ScaleoverHelpText,
-			},
-			{
 				Name:     BlueGreenCmdName,
 				HelpText: BlueGreenHelpText,
 			},
@@ -120,6 +114,7 @@ func (c *CfZddPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 
 	app1Flag := fs.String("old-app", "", "current application name")
 	app2Flag := fs.String("new-app", "", "new application being deployed")
+	baseAppName := fs.String("base-name", "", "base aplication name for versioned app names")
 	durationflag := fs.String("duration", "", "time between scalovers")
 	applicationPathflag := fs.String("p", "", "path to applcation file")
 	manifestPathFlag := fs.String("f", "", "path to application manifest")
@@ -140,7 +135,11 @@ func (c *CfZddPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 		CustomURL:       *customURLFlag,
 		BatchSize:       *batchSizeFlag,
 		RouteCheck:      *routeCheckFlag,
+		BaseAppName:     *baseAppName,
+		Commands:        commands.NewCommonCmd(cliConnection),
 	}
+
+	fmt.Println(c.cmd.ManifestPath)
 
 	if args[0] == HelpCmdName && len(args) > 1 {
 		c.cmd.HelpTopic = args[1]

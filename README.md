@@ -33,9 +33,10 @@ The method then leverages scaleover mechanism as described below.
 
 **Usage**
 ```sh
-cf deploy-zdd myapplication -f path/to/manifest.yml -p path/to/application 15s
+cf deploy-zdd myapplication -base-name myapp -f path/to/manifest.yml -p path/to/application 15s
 ```
 **myapplication** - my application name  
+**-base-name** - [Optional] base name of application if you are using versioned application names, i.e. `myapplication-1.2.3` the base name would be `myapplication`  
 **--f** - path to application manifest  
 **--p** - path to deployable artifact
 **15s** - duration in which to deploy application

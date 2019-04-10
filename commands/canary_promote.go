@@ -9,7 +9,8 @@ import (
 
 // CanaryPromote - struct
 type CanaryPromote struct {
-	args *CfZddCmd
+	args         *CfZddCmd
+	ScaleoverCmd ScaleoverCommand
 }
 
 // CmdRunner - interface type
@@ -44,6 +45,11 @@ func (s *CanaryPromote) SetArgs(args *CfZddCmd) {
 }
 
 func (s *CanaryPromote) promote() (err error) {
+
+	if s.ScaleoverCmd == nil {
+		s.ScaleoverCmd = NewScaleoverCmd(s.args)
+	}
+
 	appName := s.args.OldApp
 	canaryAppName := s.args.NewApp
 
@@ -52,51 +58,41 @@ func (s *CanaryPromote) promote() (err error) {
 
 	err = s.UpdateRoutes(app, canary)
 
-	// Do the scaleover
-	scaleovercmd := &ScaleoverCmd{
-		Args: s.args,
-	}
-	if err = scaleovercmd.ScaleoverCommand(); err != nil {
+	if err = s.ScaleoverCmd.DoScaleover(); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	if err = s.RemoveApplication(app); err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+
+	if err = s.args.Commands.RemoveApplication(appName); err != nil {
+		fmt.Printf("Error removing application: %s\n", err.Error())
+		return
 	}
 	return
 }
 
-// UpdateRoutes - function to add or remove routes from the application
-func (s *CanaryPromote) UpdateRoutes(app1 plugin_models.GetAppModel, app2 plugin_models.GetAppModel) (err error) {
+// UpdateRoutes - function to add or remove routes from the application. Apply the existing application routes to the
+// canary version of the application.
+func (s *CanaryPromote) UpdateRoutes(oldApp plugin_models.GetAppModel, canary plugin_models.GetAppModel) (err error) {
 	var (
 		output  []string
 		cliArgs []string
 	)
-	for _, route := range app1.Routes {
 
+	for _, route := range oldApp.Routes {
 		fmt.Printf("Host: %s, Domain: %s\n ", route.Host, route.Domain.Name)
 
-		cliArgs = []string{"map-route", app2.Name, route.Domain.Name, "-n", route.Host}
+		cliArgs = []string{"map-route", canary.Name, route.Domain.Name, "-n", route.Host}
 
 		output, err = s.args.Conn.CliCommand(cliArgs...)
 		fmt.Printf("Add Routes output: %+v\n", output)
 	}
 
-	for _, route := range app2.Routes {
+	for _, route := range canary.Routes {
 		fmt.Printf("Host: %s, Domain: %s\n ", route.Host, route.Domain.Name)
 		cliArgs = []string{"delete-route", route.Domain.Name, "-n", route.Host, "-f"}
 
 		output, err = s.args.Conn.CliCommand(cliArgs...)
 		fmt.Printf("Delete Routes output: %+v\n", output)
 	}
-	return
-}
-
-//RemoveApplication - function to remove application
-func (s *CanaryPromote) RemoveApplication(app plugin_models.GetAppModel) (err error) {
-	// Remove the old application
-	removeAppArgs := []string{"delete", app.Name, "-f"}
-	_, err = s.args.Conn.CliCommand(removeAppArgs...)
 	return
 }

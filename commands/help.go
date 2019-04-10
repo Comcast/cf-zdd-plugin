@@ -48,11 +48,6 @@ func (h *HelpCmd) help() (err error) {
 			"\n\t--duration = The time for scaling over the application, default is 480s" +
 			"\n\t--p = The path to the application file" +
 			"\n\t--f = The path to the application manifest"
-	case ScaleoverCmdName:
-		helpString = "scaleover help" +
-			"\n\t--oldapp = The name of the existing application" +
-			"\n\t--newapp = The name of the new application" +
-			"\n\t--duration = The time for scaling over the application, default is 480s"
 	case BlueGreenCmdName:
 		helpString = "blue-green help" +
 			"\n\t--newapp = The name of the new application" +

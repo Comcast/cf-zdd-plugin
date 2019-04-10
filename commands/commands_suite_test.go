@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestScaleoverPlugin(t *testing.T) {
+func TestCommandsPlugin(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Scaleover Suite")
+	RunSpecs(t, "Commands Suite")
 }

@@ -3,6 +3,6 @@ memory: 1024M
 timeout: 120
 host: ars-dev
 instances: 1
-domains:
-  - mylocaldomain.com
-  - myseconddomain.com
+routes:
+  - myapp1.mylocaldomain.com
+  - myapp2.myseconddomain.com

@@ -1,11 +1,27 @@
-package commands
+///*
+//* Copyright 2016 Comcast Cable Communications Management, LLC
+//*
+//* Licensed under the Apache License, Version 2.0 (the "License");
+//* you may not use this file except in compliance with the License.
+//* You may obtain a copy of the License at
+//*
+//* http://www.apache.org/licenses/LICENSE-2.0
+//*
+//* Unless required by applicable law or agreed to in writing, software
+//* distributed under the License is distributed on an "AS IS" BASIS,
+//* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//* See the License for the specific language governing permissions and
+//* limitations under the License.
+// */
+//
+package commands_test
 
 import (
 	"fmt"
+	"github.com/comcast/cf-zdd-plugin/commands"
+	"github.com/comcast/cf-zdd-plugin/fakes"
 	"strings"
 
-	"code.cloudfoundry.org/cli/plugin/pluginfakes"
-	"github.com/comcast/cf-zdd-plugin/fakes"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -14,113 +30,86 @@ var _ = Describe("canaryDeploy", func() {
 	Describe(".init", func() {
 		Context("when the package is imported", func() {
 			It("should then be registered with the canary repo", func() {
-				_, ok := GetRegistry()[CanaryDeployCmdName]
-				Ω(ok).Should(BeTrue())
+				_, ok := commands.GetRegistry()[commands.CanaryDeployCmdName]
+				Expect(ok).Should(BeTrue())
 			})
 		})
 	})
 	Describe("given: a run() method on a canarydeploy object which has been initialized with valid args", func() {
-		var canaryDeploy *CanaryDeploy
-		var ctrlAppName = "myTestApp1.2.3#abcd"
-		var ctrlManifestPath = "../fixtures/manifest.yml"
-		var fakeUtilities *fakes.FakeUtilities
-		var cfZddCmd *CfZddCmd
-		var fakeConnection *pluginfakes.FakeCliConnection
+		var (
+			canaryDeploy     *commands.CanaryDeploy
+			ctrlAppName      = "myTestApp1.2.3#abcd"
+			ctrlManifestPath = "../fixtures/manifest.yml"
+			cfZddCmd         *commands.CfZddCmd
+			fakeConnection   *fakes.FakeCliConnection
+			fakeCommand      *fakes.FakeCommonCmd
+		)
 
 		BeforeEach(func() {
-			fakeUtilities = new(fakes.FakeUtilities)
-			fakeConnection = new(pluginfakes.FakeCliConnection)
-			cfZddCmd = &CfZddCmd{
+			fakeConnection = new(fakes.FakeCliConnection)
+			fakeCommand = new(fakes.FakeCommonCmd)
+
+			cfZddCmd = &commands.CfZddCmd{
 				CmdName:         "deploy-canary",
 				NewApp:          "myTestApp1.2.3#abcd",
 				ManifestPath:    "../fixtures/manifest.yml",
 				ApplicationPath: "application.jar",
 				Conn:            fakeConnection,
+				Commands:        fakeCommand,
 			}
-			canaryDeploy = &CanaryDeploy{
-				Utils: fakeUtilities,
-			}
+			canaryDeploy = &commands.CanaryDeploy{}
 
 			canaryDeploy.SetArgs(cfZddCmd)
 		})
 		Context("when called with a valid connection object and a domain defined in the manifest", func() {
 			var err error
 
-			var ctrlArgsNoRoute = []string{"push", ctrlAppName, "-f", ctrlManifestPath, "-p", "application.jar", "-i", "1", "--no-route", "--no-start"}
-			var ctrlArgsMapRoute = []string{"map-route", ctrlAppName, "mylocaldomain.com", "-n", CreateCanaryRouteName(ctrlAppName)}
+			var ctrlArgsMapRoute = []string{"map-route", ctrlAppName, "mylocaldomain.com", "-n", commands.CreateCanaryRouteName(ctrlAppName)}
 			BeforeEach(func() {
 				err = canaryDeploy.Run()
 			})
 			It("should not return an error", func() {
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ShouldNot(HaveOccurred())
 			})
 			It("should deploy an application with a canary route", func() {
-				Ω(fakeConnection.CliCommandCallCount()).Should(Equal(3))
-				Ω(fakeConnection.CliCommandArgsForCall(0)).Should(Equal(ctrlArgsNoRoute))
-				Ω(fakeConnection.CliCommandArgsForCall(1)).Should(Equal(ctrlArgsMapRoute))
+				Expect(fakeConnection.CliCommandCallCount()).Should(Equal(2))
+				Expect(fakeConnection.CliCommandArgsForCall(0)).Should(Equal(ctrlArgsMapRoute))
 			})
 		})
 		Context("when called with a valid connection object and multiple domains defined in the manifest", func() {
 			var err error
-			var ctrlArgsNoRoute []string
 			var ctrlArgsMapRoute []string
 			BeforeEach(func() {
-				ctrlArgsNoRoute = []string{"push", ctrlAppName, "-f", ctrlManifestPath, "-p", "application.jar", "-i", "1", "--no-route", "--no-start"}
-				ctrlArgsMapRoute = []string{"map-route", ctrlAppName, "mylocaldomain.com", "-n", CreateCanaryRouteName(ctrlAppName)}
+				ctrlArgsMapRoute = []string{"map-route", ctrlAppName, "mylocaldomain.com", "-n", commands.CreateCanaryRouteName(ctrlAppName)}
 				ctrlManifestPath = "../fixtures/manifest-multidomain.yml"
 				cfZddCmd.ManifestPath = ctrlManifestPath
 				err = canaryDeploy.Run()
 			})
 			It("should not return an error", func() {
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ShouldNot(HaveOccurred())
 			})
 			It("should deploy an application with a canary route", func() {
-				Ω(fakeConnection.CliCommandCallCount()).Should(Equal(4))
-				Ω(fakeConnection.CliCommandArgsForCall(0)).Should(Equal(ctrlArgsNoRoute))
-				Ω(fakeConnection.CliCommandArgsForCall(1)).Should(Equal(ctrlArgsMapRoute))
-			})
-		})
-		Context("when called with a valid connection object and both domain and domains defined in the manifest", func() {
-			var err error
-
-			var ctrlArgsNoRoute []string
-			var ctrlArgsMapRoute []string
-			BeforeEach(func() {
-				ctrlArgsNoRoute = []string{"push", ctrlAppName, "-f", ctrlManifestPath, "-p", "application.jar", "-i", "1", "--no-route", "--no-start"}
-				ctrlArgsMapRoute = []string{"map-route", ctrlAppName, "mylocaldomain.com", "-n", CreateCanaryRouteName(ctrlAppName)}
-				ctrlManifestPath = "../fixtures/manifest-bothdomain.yml"
-				cfZddCmd.ManifestPath = ctrlManifestPath
-				err = canaryDeploy.Run()
-			})
-			It("should not return an error", func() {
-				Ω(err).ShouldNot(HaveOccurred())
-			})
-			It("should deploy an application with a canary route", func() {
-				Ω(fakeConnection.CliCommandCallCount()).Should(Equal(5))
-				Ω(fakeConnection.CliCommandArgsForCall(0)).Should(Equal(ctrlArgsNoRoute))
-				Ω(fakeConnection.CliCommandArgsForCall(1)).Should(Equal(ctrlArgsMapRoute))
+				Expect(fakeConnection.CliCommandCallCount()).Should(Equal(2))
+				Expect(fakeConnection.CliCommandArgsForCall(0)).Should(Equal(ctrlArgsMapRoute))
 			})
 		})
 		Context("when called with a valid connection object and no domain defined in the manifest", func() {
 			var err error
-
-			var ctrlArgsNoRoute []string
 			var ctrlArgsMapRoute []string
+
 			BeforeEach(func() {
 				ctrlManifestPath = "../fixtures/manifest-nodomain.yml"
 				cfZddCmd.ManifestPath = ctrlManifestPath
-				ctrlArgsNoRoute = []string{"push", ctrlAppName, "-f", ctrlManifestPath, "-p", "application.jar", "-i", "1", "--no-route", "--no-start"}
-				ctrlArgsMapRoute = []string{"map-route", ctrlAppName, "u1.app.cloud.comcast.net", "-n", CreateCanaryRouteName(ctrlAppName)}
-				fakeUtilities.GetDefaultDomainReturns("u1.app.cloud.comcast.net")
+				fakeCommand.GetDefaultDomainReturns("u1.app.cloud.comcast.net")
+				ctrlArgsMapRoute = []string{"map-route", ctrlAppName, "u1.app.cloud.comcast.net", "-n", commands.CreateCanaryRouteName(ctrlAppName)}
 				err = canaryDeploy.Run()
 			})
 			It("should not return an error", func() {
-				Ω(err).ShouldNot(HaveOccurred())
+				Expect(err).ShouldNot(HaveOccurred())
 			})
 			It("should deploy an application with a canary route", func() {
-				Ω(fakeConnection.CliCommandCallCount()).Should(Equal(3))
-				Ω(fakeConnection.CliCommandArgsForCall(0)).Should(Equal(ctrlArgsNoRoute))
-				Ω(fakeConnection.CliCommandArgsForCall(1)).Should(Equal(ctrlArgsMapRoute))
+				Expect(fakeConnection.CliCommandCallCount()).Should(Equal(2))
+				Expect(fakeConnection.CliCommandArgsForCall(0)).Should(Equal(ctrlArgsMapRoute))
 			})
 		})
 	})
@@ -128,26 +117,26 @@ var _ = Describe("canaryDeploy", func() {
 		Context("when given an appname with dots", func() {
 			var ctrlAppname = "ctrlAppName-1.2.3"
 			It("should remove dots and return a valid canary routename", func() {
-				routename := CreateCanaryRouteName(ctrlAppname)
-				canaryRoute := fmt.Sprintf("%s-%s", ctrlAppname, CanaryRouteSuffix)
-				canaryRoute = strings.Replace(canaryRoute, ".", CanaryRouteSeparator, -1)
-				Ω(routename).Should(Equal(canaryRoute))
+				routename := commands.CreateCanaryRouteName(ctrlAppname)
+				canaryRoute := fmt.Sprintf("%s-%s", ctrlAppname, commands.CanaryRouteSuffix)
+				canaryRoute = strings.Replace(canaryRoute, ".", commands.CanaryRouteSeparator, -1)
+				Expect(routename).Should(Equal(canaryRoute))
 			})
 		})
 		Context("when given an appname containing #", func() {
 			var ctrlAppname = "ctrlAppName#45"
 			It("should remove hashes and return a valid canary routename", func() {
-				routename := CreateCanaryRouteName(ctrlAppname)
-				canaryRoute := fmt.Sprintf("%s-%s", ctrlAppname, CanaryRouteSuffix)
-				canaryRoute = strings.Replace(canaryRoute, "#", CanaryRouteSeparator, -1)
-				Ω(routename).Should(Equal(canaryRoute))
+				routename := commands.CreateCanaryRouteName(ctrlAppname)
+				canaryRoute := fmt.Sprintf("%s-%s", ctrlAppname, commands.CanaryRouteSuffix)
+				canaryRoute = strings.Replace(canaryRoute, "#", commands.CanaryRouteSeparator, -1)
+				Expect(routename).Should(Equal(canaryRoute))
 			})
 		})
 		Context("when given an appname", func() {
 			var ctrlAppname = "ctrlAppName"
 			It("should return a valid canary routename", func() {
-				routename := CreateCanaryRouteName(ctrlAppname)
-				Ω(routename).Should(Equal(fmt.Sprintf("%s-%s", ctrlAppname, CanaryRouteSuffix)))
+				routename := commands.CreateCanaryRouteName(ctrlAppname)
+				Expect(routename).Should(Equal(fmt.Sprintf("%s-%s", ctrlAppname, commands.CanaryRouteSuffix)))
 			})
 		})
 	})

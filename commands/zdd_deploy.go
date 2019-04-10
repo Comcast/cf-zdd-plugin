@@ -3,17 +3,18 @@ package commands
 import (
 	"fmt"
 	"os"
-	"strings"
 )
 
 // ZddDeploy - struct
 type ZddDeploy struct {
-	args *CfZddCmd
+	args          *CfZddCmd
+	ScalerOverCmd ScaleoverCommand
 }
 
 // ZddDeployCmdName - constants
 const (
 	ZddDeployCmdName = "deploy-zdd"
+	DefaultDuration  = "480s"
 )
 
 func init() {
@@ -33,83 +34,69 @@ func (s *ZddDeploy) SetArgs(args *CfZddCmd) {
 
 func (s *ZddDeploy) deploy() (err error) {
 	var (
-		venerable string
-		apps      []string
+		oldApplication string
+		venerable      string
+		isAppDeployed  bool
+		searchAppName  string
 	)
 
-	appName := s.args.NewApp
+	if s.ScalerOverCmd == nil {
+		s.ScalerOverCmd = NewScaleoverCmd(s.args)
+	}
+
+	applicationToDeploy := s.args.NewApp
 	manifestPath := s.args.ManifestPath
 	artifactPath := s.args.ApplicationPath
 
-	fmt.Printf("Calling zdd-deploy with args App2=%s, manifestPath=%s, artifactPath=%s\n", appName, manifestPath, artifactPath)
+	fmt.Printf("Calling zdd-deploy with args App2=%s, manifestPath=%s, artifactPath=%s\n", applicationToDeploy, manifestPath, artifactPath)
 	if s.args.Duration == "" {
-		s.args.Duration = "480s"
+		s.args.Duration = DefaultDuration
+	}
+
+	// Verify if application is currently deployed and current name if app name is versioned
+	if s.args.BaseAppName != "" {
+		searchAppName = s.args.BaseAppName
+	} else {
+		searchAppName = applicationToDeploy
 	}
 
 	//Get the application list from cf
-	apps = s.getDeployedApplications(appName)
-	fmt.Printf("Found application versions: %v\n", apps)
+	oldApplication, isAppDeployed = s.args.Commands.IsApplicationDeployed(searchAppName)
 
-	// Check if new deployment and deploy
-	if apps == nil {
-		fmt.Printf("Initial deployment of %s\n", appName)
-		deployArgs := []string{"push", s.args.NewApp, "-f", s.args.ManifestPath, "-p", s.args.ApplicationPath}
-		_, err = s.args.Conn.CliCommand(deployArgs...)
+	if !isAppDeployed {
+		fmt.Printf("Initial deployment of %s\n", applicationToDeploy)
+		if err = s.args.Commands.PushApplication(applicationToDeploy, artifactPath, manifestPath); err != nil {
+			fmt.Printf("Error occurred pushing application: %s\n", err.Error())
+		}
 	} else {
 		//Check if redeployment and rename old app.
-		if isAppDeployed(apps, appName) {
-			venerable = strings.Join([]string{appName, "venerable"}, "-")
-			renameArgs := []string{"rename", appName, venerable}
-			_, err = s.args.Conn.CliCommand(renameArgs...)
+		if oldApplication == applicationToDeploy {
+			venerable = oldApplication + "-venerable"
+			err = s.args.Commands.RenameApplication(oldApplication, venerable)
 			if err != nil {
 				fmt.Println(err.Error())
 			}
 		} else {
-			venerable = apps[0]
+			venerable = oldApplication
 		}
 		fmt.Printf("Venerable version assigned to %s\n", venerable)
-		//Push new copy of the app with no-start
-		deployArgs := []string{"push", appName, "-f", manifestPath, "-p", artifactPath, "-i", "1", "--no-start"}
-		_, err = s.args.Conn.CliCommand(deployArgs...)
-		if err != nil {
+
+		if err = s.args.Commands.PushApplication(applicationToDeploy, artifactPath, manifestPath, "-i", "1", "--no-start"); err != nil {
 			fmt.Println(err.Error())
 		}
+
 		// Do the scaleover
 		s.args.OldApp = venerable
-		scaleovercmd := &ScaleoverCmd{
-			Args: s.args,
-		}
-		if err = scaleovercmd.ScaleoverCommand(); err != nil {
+
+		if err = s.ScalerOverCmd.DoScaleover(); err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
 		}
-
 		fmt.Printf("Removing app: %s\n", venerable)
-		removeOldAppArgs := []string{"delete", venerable, "-f"}
-		_, err = s.args.Conn.CliCommand(removeOldAppArgs...)
+		if err = s.args.Commands.RemoveApplication(venerable); err != nil {
+			fmt.Printf("Unable to remove old application: %s, error: %s\n", venerable, err.Error())
+		}
 	}
 
 	return
-}
-
-func (s *ZddDeploy) getDeployedApplications(appName string) []string {
-	var applist []string
-	shortName := strings.Split(appName, "#")[0]
-	if output, err := s.args.Conn.GetApps(); err == nil {
-		for _, entry := range output {
-			if strings.HasPrefix(entry.Name, shortName) {
-				applist = append(applist, entry.Name)
-			}
-		}
-	}
-	return applist
-}
-
-func isAppDeployed(apps []string, app string) bool {
-	for _, s := range apps {
-		if s == app {
-			return true
-		}
-	}
-	return false
 }
